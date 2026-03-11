@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Smoke Cloud Analyzer"
+version = "1.0.0"
+id = "artifacts/smoke-analyzer"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 23963
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/smoke-analyzer run dev"
+
+[services.env]
+PORT = "23963"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/smoke-analyzer", "run", "build"]
+publicDir = "artifacts/smoke-analyzer/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

@@ -16,6 +16,17 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Artifacts
+
+### `artifacts/smoke-analyzer` — Smoke Cloud Analyzer (react-vite, preview at `/`)
+Real-time smoke/vapor detection and analysis app using webcam + HTML5 Canvas. Entirely client-side (no backend).
+- **Smoke detection**: background subtraction pixel-diff algorithm, grid-cell grouping
+- **Metrics**: cloud size, density, velocity, spread rate, circularity
+- **Ring detection**: hollow-center check + circularity score
+- **Exhale scoring**: 0–100 score per exhale based on volume, density, duration, ring quality
+- **UI**: dark cinematic HUD with live telemetry panel, exhale log, sensitivity controls
+- Key files: `src/lib/smoke-analyzer.ts` (core CV), `src/hooks/use-smoke-analyzer.ts`, `src/components/`
+
 ## Structure
 
 ```text

@@ -1,0 +1,10 @@
+packages:
+  "framer-motion": "For cinematic UI transitions and animated number counters"
+  "lucide-react": "For UI icons"
+
+images: []
+
+notes:
+  - "The smoke detection is fully client-side using Canvas API and ImageData manipulation."
+  - "Performance is optimized by downscaling the video to a processing canvas (320x240) and using a grid-based connected component analysis rather than pixel-perfect flood fills."
+  - "No backend API required. Everything runs locally."
