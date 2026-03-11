@@ -34,9 +34,9 @@ export const CameraView = ({ videoRef, procCanvasRef, overlayCanvasRef, isProces
   }, [videoRef, overlayCanvasRef]);
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="relative w-full h-full bg-black/50 rounded-2xl overflow-hidden border border-primary/20 shadow-2xl shadow-primary/5 flex items-center justify-center hud-border"
+      className="relative w-full h-full min-h-[220px] max-h-[38vh] bg-black/50 rounded-2xl overflow-hidden border border-primary/20 shadow-2xl shadow-primary/5 flex items-center justify-center hud-border"
     >
       {!hasPermission && (
         <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-black/80 backdrop-blur-sm p-8 text-center">

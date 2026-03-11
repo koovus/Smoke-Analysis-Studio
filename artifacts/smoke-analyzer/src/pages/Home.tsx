@@ -43,24 +43,25 @@ export default function Home() {
 
       {/* Main Content Grid */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
-        
-        {/* Left Column: Camera Feed */}
-        <div className="col-span-1 lg:col-span-2 relative min-h-[50vh] lg:min-h-0 flex flex-col">
-          <CameraView 
-            videoRef={videoRef}
-            procCanvasRef={procCanvasRef}
-            overlayCanvasRef={overlayCanvasRef}
-            isProcessing={!!metrics}
-          />
-          
-          <div className="mt-4 flex justify-between items-center text-xs font-mono text-muted-foreground opacity-50 px-2">
-            <div>OPTICAL SENSOR ACQUIRED</div>
+
+        {/* Left Column: Camera Feed (compact) */}
+        <div className="col-span-1 flex flex-col">
+          <div className="w-full max-h-[38vh] min-h-[220px]">
+            <CameraView
+              videoRef={videoRef}
+              procCanvasRef={procCanvasRef}
+              overlayCanvasRef={overlayCanvasRef}
+              isProcessing={!!metrics}
+            />
+          </div>
+          <div className="mt-3 flex justify-between items-center text-xs font-mono text-muted-foreground opacity-50 px-1">
+            <div>OPTICAL SENSOR</div>
             <div>[ SYS: ONLINE ]</div>
           </div>
         </div>
 
-        {/* Right Column: Dashboards */}
-        <div className="col-span-1 flex flex-col space-y-6 min-h-[50vh] lg:min-h-0">
+        {/* Right Columns: Dashboards (wider) */}
+        <div className="col-span-1 lg:col-span-2 flex flex-col space-y-6 min-h-0">
           <StatsPanel metrics={metrics} />
           <HistoryPanel exhales={exhales} />
           <ControlsPanel onUpdate={updateConfig} />
