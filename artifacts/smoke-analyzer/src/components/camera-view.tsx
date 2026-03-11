@@ -9,7 +9,7 @@ interface CameraViewProps {
 }
 
 export const CameraView = ({ videoRef, procCanvasRef, overlayCanvasRef, isProcessing }: CameraViewProps) => {
-  const { hasPermission, error } = useCamera();
+  const { hasPermission, error } = useCamera(videoRef);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Keep overlay canvas matching video dimensions
