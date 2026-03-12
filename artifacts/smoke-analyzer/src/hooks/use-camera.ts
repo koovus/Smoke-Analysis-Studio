@@ -1,64 +1,46 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export function useCamera(videoRef?: React.RefObject<HTMLVideoElement | null>) {
+export function useCamera(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isCameraOn, setIsCameraOn] = useState(true);
-  const internalRef = useRef<HTMLVideoElement>(null);
-  const activeRef = videoRef ?? internalRef;
+  const [isCameraOn, setIsCameraOn] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
   const startCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = mediaStream;
       setHasPermission(true);
       setError(null);
-      if (activeRef.current) {
-        activeRef.current.srcObject = mediaStream;
-        activeRef.current.play().catch(() => {});
+      setIsCameraOn(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.play().catch(() => {});
       }
     } catch (err: any) {
-      console.error('Camera setup failed', err);
+      console.error('Camera error:', err);
       setHasPermission(false);
-      setError(err.message || 'Failed to access camera');
+      setError(err.message || 'Could not access camera');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [videoRef]);
 
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    if (activeRef.current) {
-      activeRef.current.srcObject = null;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsCameraOn(false);
+  }, [videoRef]);
 
-  const toggleCamera = useCallback(() => {
-    if (streamRef.current) {
-      stopCamera();
-      setIsCameraOn(false);
-    } else {
-      startCamera();
-      setIsCameraOn(true);
-    }
-  }, [startCamera, stopCamera]);
-
+  // Start on mount
   useEffect(() => {
     startCamera();
     return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [startCamera]);
 
-  return { videoRef: activeRef, hasPermission, error, isCameraOn, toggleCamera };
+  return { hasPermission, error, isCameraOn, startCamera, stopCamera };
 }
