@@ -39,7 +39,7 @@ export default function Home() {
       {/* Main Grid */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
 
-        {/* Left: Camera + Button */}
+        {/* Left: Camera + Controls */}
         <div className="col-span-1 flex flex-col gap-3">
 
           <CameraView
@@ -52,7 +52,7 @@ export default function Home() {
             error={error}
           />
 
-          {/* Camera toggle button — big, clear, outside the camera */}
+          {/* Camera toggle button */}
           <button
             onClick={isCameraOn ? stopCamera : startCamera}
             className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border font-mono text-sm font-bold tracking-wider transition-all ${
@@ -67,13 +67,15 @@ export default function Home() {
             }
           </button>
 
+          {/* Sensitivity controls — same column as camera */}
+          <ControlsPanel onUpdate={updateConfig} />
+
         </div>
 
         {/* Right: Dashboards */}
         <div className="col-span-1 lg:col-span-2 flex flex-col space-y-6 min-h-0">
           <StatsPanel metrics={metrics} />
           <HistoryPanel exhales={exhales} />
-          <ControlsPanel onUpdate={updateConfig} />
         </div>
 
       </main>
