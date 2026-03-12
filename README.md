@@ -10,14 +10,42 @@ A browser-based computer vision tool that uses your webcam to detect, measure, a
 
 SMOKE VISION analyses cigarette (or any) smoke exhaled in front of a camera and gives you live data on the properties of the cloud:
 
-- **Cloud Size** — how much of the frame the smoke occupies, in pixels squared
-- **Cloud Density** — how opaque/thick the smoke appears (0–100%)
-- **Velocity & Direction** — how fast the cloud is moving and in which direction
-- **Spread Rate** — how quickly the cloud is expanding per second
-- **Circularity** — how round the cloud shape is (used to detect smoke rings)
-- **Smoke Ring Detection** — automatically flags when a ring shape is detected, based on circularity and a hollow-center test
+- **Cloud Size** — how much of the frame the smoke occupies, expressed as a percentage
+- **Smoke Thickness** — how opaque/dense the smoke appears (thin / medium / thick)
+- **Cloud Shape** — circularity of the detected blob (wispy / round / ring)
+- **Velocity & Direction** — how fast the cloud is moving and in which cardinal direction
+- **Smoke Ring Detection** — automatically flags when a ring shape is detected based on circularity and a hollow-centre test
 - **Exhale Scoring** — each distinct exhale is rated 0–100 when it dissipates, factoring in volume, density, duration, and whether a ring was produced
 - **Exhale History** — keeps the last 10 rated exhales, colour-coded by tier (gold / silver / bronze / grey)
+
+---
+
+## Features
+
+### Live Analysis
+Real-time CV pipeline running at up to 60fps with throttled React updates (~10/sec) to keep the UI smooth. All metrics update continuously while the camera is active.
+
+### Clip Recorder
+Record the live camera feed combined with the detection overlay as a video clip. Three duration options — **6 s**, **15 s**, or **30 s** — with a progress bar and countdown. The clip auto-downloads when the timer finishes.
+
+- **Format**: MP4 (H.264) via the WebCodecs API on Chrome/Edge; falls back to WebM on older browsers
+- **Content**: Composite of the raw camera feed + green detection overlay, recorded at 30fps
+- **Output**: `smoke-vision-Xs-timestamp.mp4`
+
+### WASD Key Effects
+Press any WASD key to trigger a full-screen particle effect with a synthesised sound. Effects layer if you press multiple keys quickly.
+
+| Key | Visual Effect | Sound |
+|-----|--------------|-------|
+| **W** | 140 spinning gold coins burst from screen centre outward with gravity — each coin flips as it flies | Slot machine spin → ascending win fanfare |
+| **A** | Electric blue & white sparks explode from centre and fade fast | Sharp electric zap |
+| **S** | 120 coloured confetti pieces shower from the top, drifting side to side | Ascending party-pop notes |
+| **D** | Orange/red fire particles rise from the bottom centre, shrinking as they fade | Low crackle + bass rumble |
+
+All sounds are synthesised in the browser using the Web Audio API — no audio files required.
+
+### Sensitivity Controls
+In-app sliders for every detection parameter, grouped in the left column next to the camera for easy access.
 
 ---
 
@@ -50,7 +78,7 @@ The background is initialised from the first frame and then updated using an exp
 background[px] = background[px] × (1 - updateRate) + current[px] × updateRate
 ```
 
-The update rate slows down significantly on pixels classified as smoke, so the background model does not "learn" the smoke into itself. Default update speed is 5% per frame on non-smoke pixels and 0.5% on smoke pixels.
+The update rate slows significantly on pixels classified as smoke, so the background model does not "learn" the smoke into itself. Default: 5% per frame on non-smoke pixels, 0.5% on smoke pixels.
 
 ### Smoke Detection Criteria
 
@@ -58,14 +86,14 @@ A pixel is classified as smoke when both conditions are true:
 
 | Condition | Default |
 |-----------|---------|
-| `abs(current_gray - background_gray)` > threshold | threshold = 20 |
-| `current_gray` > min brightness | min brightness = 80 |
+| `abs(current_gray - background_gray)` > threshold | threshold = 10 |
+| `current_gray` > min brightness | min brightness = 50 |
 
 The brightness check prevents dark shadows from triggering false positives.
 
 ### Grid Aggregation
 
-Rather than analysing every pixel for grouping (which would be expensive), the frame is divided into a **32×24 grid of cells** (each cell covers a 10×10 pixel region at 320×240 resolution). A cell is marked active when the total smoke-pixel differential within it exceeds 200. Connected active cells form the detected smoke cloud.
+Rather than analysing every pixel for grouping (which would be expensive), the frame is divided into a **32×24 grid of cells**. A cell is marked active when the total smoke-pixel differential within it exceeds 80. Connected active cells form the detected smoke cloud.
 
 ### Ring Detection
 
@@ -84,7 +112,7 @@ When smoke disappears (blob drops below minimum size), the exhale is scored:
 | Cloud volume (max area reached) | 40 pts |
 | Cloud density (max density reached) | 30 pts |
 | Duration (capped at 5 seconds) | 30 pts |
-| Ring bonus (if ring was detected) | +30 pts (can push over 100, capped at 100) |
+| Ring bonus (if ring was detected) | +30 pts (capped at 100) |
 
 Exhales shorter than 0.5 seconds or smaller than 5% of the frame are discarded.
 
@@ -112,6 +140,9 @@ Exhales shorter than 0.5 seconds or smaller than 5% of the frame are discarded.
 | Icons | Lucide React |
 | Camera API | `navigator.mediaDevices.getUserMedia` |
 | Vision | HTML5 Canvas (`getImageData`, `putImageData`) |
+| Recording | WebCodecs API + `mp4-muxer` (MP4); MediaRecorder fallback (WebM) |
+| Audio | Web Audio API (synthesised, no audio files) |
+| Particles | Canvas 2D API (RAF-based, ref-driven, no React re-renders) |
 | State | React hooks + refs (no external state library) |
 | Routing | Wouter |
 | Build | Vite (static output, no server needed) |
@@ -129,14 +160,18 @@ artifacts/smoke-analyzer/
 │   │   └── smoke-analyzer.ts       # Core CV engine (detection, metrics, scoring, overlay drawing)
 │   ├── hooks/
 │   │   ├── use-camera.ts           # WebRTC camera setup and permission handling
-│   │   └── use-smoke-analyzer.ts   # Frame loop, React integration, state throttling
+│   │   ├── use-smoke-analyzer.ts   # Frame loop, React integration, state throttling
+│   │   ├── use-recorder.ts         # MP4/WebM clip recorder (WebCodecs + mp4-muxer)
+│   │   └── use-key-effects.ts      # WASD key listener + Web Audio sound synthesis
 │   ├── components/
 │   │   ├── camera-view.tsx         # Video feed + overlay canvas + HUD chrome
-│   │   ├── stats-panel.tsx         # Live telemetry display (size, density, kinetics)
+│   │   ├── stats-panel.tsx         # Live telemetry display
 │   │   ├── history-panel.tsx       # Exhale history log with scored cards
-│   │   └── controls-panel.tsx      # Sensitivity sliders + debug toggle
+│   │   ├── controls-panel.tsx      # Sensitivity sliders + debug toggle
+│   │   ├── record-panel.tsx        # Clip recorder UI (duration buttons, progress bar)
+│   │   └── effects-overlay.tsx     # Full-screen particle system canvas (WASD effects)
 │   ├── pages/
-│   │   └── Home.tsx                # Main layout (camera left, panels right)
+│   │   └── Home.tsx                # Main layout (camera + controls left, panels right)
 │   ├── App.tsx                     # Router + providers
 │   └── index.css                   # Tailwind theme (dark cinematic, smoke/vapor aesthetic)
 └── package.json
@@ -146,14 +181,14 @@ artifacts/smoke-analyzer/
 
 ## Sensitivity Controls
 
-All controls are available in the **Sensitivity Controls** panel within the app:
+All controls are available in the **Sensitivity Controls** panel beneath the camera:
 
 | Control | Description | Default |
 |---------|-------------|---------|
-| Detection Threshold | Minimum pixel difference to count as smoke | 20 |
-| Min Brightness | Ignore pixels darker than this (prevents shadow false positives) | 80 |
+| Detection Threshold | Minimum pixel difference to count as smoke | 10 |
+| Min Brightness | Ignore pixels darker than this (prevents shadow false positives) | 50 |
 | Background Update Speed | How fast the background model adapts | 5% |
-| Min Blob Size | Minimum grid cells for a cloud to register | 5 cells |
+| Min Blob Size | Minimum grid cells for a cloud to register | 4 cells |
 | Debug Overlay | Shows raw detection grid in red over the video | Off |
 
 ---
@@ -162,10 +197,10 @@ All controls are available in the **Sensitivity Controls** panel within the app:
 
 ### Requirements
 
-- A modern browser (Chrome, Edge, or Firefox recommended)
+- A modern browser (Chrome or Edge recommended for MP4 recording via WebCodecs)
 - A webcam
 - Good lighting — smoke is most detectable against a dark or contrasting background
-- Best results: exhale smoke with a light or window behind you, so the smoke appears lighter than the background
+- Best results: exhale smoke with a light or window behind you so the smoke appears lighter than the background
 
 ### Run Locally
 
@@ -193,9 +228,10 @@ Output is in `artifacts/smoke-analyzer/dist/public/` — fully static, can be se
 
 - **Lighting**: Side lighting or backlighting works best. The algorithm detects change from a background, so smoke that contrasts well with what's behind it is easier to detect.
 - **Background**: A plain, still background reduces false positives. Moving objects (people walking by, flickering lights) will trigger the detector.
-- **Smoke rings**: Blow rings slowly and hold them steady in frame for 1–2 seconds after formation for the hollow-center detection to trigger.
+- **Smoke rings**: Blow rings slowly and hold them steady in frame for 1–2 seconds after formation for the hollow-centre detection to trigger.
 - **Sensitivity**: If the detector misses thin wisps, lower the Detection Threshold. If it fires on shadows or hand movements, raise it.
 - **Debug mode**: Enable the Debug Overlay to see exactly which grid cells the algorithm is activating — useful for tuning threshold settings.
+- **Recording**: For best clip quality, use Chrome or Edge (MP4/H.264). Firefox will produce a WebM file instead.
 
 ---
 
@@ -203,9 +239,9 @@ Output is in `artifacts/smoke-analyzer/dist/public/` — fully static, can be se
 
 - **One blob**: The current implementation tracks a single primary smoke cloud per frame. Multiple simultaneous independent clouds are merged into one bounding box.
 - **Motion false positives**: Any fast movement in frame (waving hands, people walking by) will temporarily trigger the detector. The background model recovers within a few seconds.
-- **Thin wisps**: Very light or thin smoke (early part of an exhale, or dispersing wisps) may fall below the detection threshold. Lower the threshold if needed.
-- **Camera quality**: The algorithm processes at 320×240 internally. Higher resolution cameras produce sharper video but don't improve detection accuracy — the algorithm is intentionally low-res for performance.
-- **No audio**: The app does not use the microphone. Exhale detection is purely visual.
+- **Thin wisps**: Very light or thin smoke may fall below the detection threshold. Lower the threshold if needed.
+- **Camera quality**: The algorithm processes at 320×240 internally. Higher resolution cameras produce sharper video but don't improve detection accuracy.
+- **No audio input**: The app does not use the microphone. Exhale detection is purely visual.
 
 ---
 
@@ -214,11 +250,11 @@ Output is in `artifacts/smoke-analyzer/dist/public/` — fully static, can be se
 - [ ] Multi-blob tracking (separate clouds with individual IDs and trails)
 - [ ] Optical flow for more accurate velocity measurement
 - [ ] Smoke trail path drawing (persistence of centroid history)
-- [ ] Export/share exhale scores and history
-- [ ] WebGL accelerated pixel processing for higher frame rate analysis
-- [ ] Configurable scoring weights (user-defined point allocation)
 - [ ] Session statistics (best score, average score, total exhales, ring success rate)
+- [ ] WebGL accelerated pixel processing for higher frame rate analysis
 - [ ] Mobile support (rear camera option for third-person filming)
+- [ ] Configurable scoring weights (user-defined point allocation)
+- [ ] Additional WASD effects and customisable key bindings
 
 ---
 
