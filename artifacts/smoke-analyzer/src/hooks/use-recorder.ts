@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 
 export function useRecorder(
   videoRef: React.RefObject<HTMLVideoElement | null>,
@@ -9,11 +10,9 @@ export function useRecorder(
   const [totalSeconds, setTotalSeconds] = useState(0);
 
   const compositeCanvas = useRef<HTMLCanvasElement | null>(null);
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
+  const activeRef = useRef(false);
   const rafId = useRef<number | null>(null);
   const timerId = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeRef = useRef(false);
 
   useEffect(() => {
     compositeCanvas.current = document.createElement('canvas');
@@ -23,11 +22,11 @@ export function useRecorder(
     };
   }, []);
 
-  const drawLoop = useCallback(() => {
+  const drawFrame = useCallback(() => {
     const video = videoRef.current;
     const overlay = overlayCanvasRef.current;
     const canvas = compositeCanvas.current;
-    if (!canvas || !video || !activeRef.current) return;
+    if (!canvas || !video) return;
 
     const w = video.videoWidth || 640;
     const h = video.videoHeight || 480;
@@ -37,52 +36,31 @@ export function useRecorder(
     }
 
     const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, w, h);
-      if (overlay && overlay.width > 0 && overlay.height > 0) {
-        ctx.drawImage(overlay, 0, 0, w, h);
-      }
-    }
-    rafId.current = requestAnimationFrame(drawLoop);
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, w, h);
+    if (overlay && overlay.width > 0) ctx.drawImage(overlay, 0, 0, w, h);
   }, [videoRef, overlayCanvasRef]);
 
-  const stopAndSave = useCallback(() => {
-    activeRef.current = false;
-    if (rafId.current) cancelAnimationFrame(rafId.current);
-    if (timerId.current) clearInterval(timerId.current);
-    if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') {
-      mediaRecorder.current.stop();
-    }
-  }, []);
-
-  const startRecording = useCallback((durationSeconds: number) => {
+  const startRecording = useCallback(async (durationSeconds: number) => {
     const video = videoRef.current;
     const canvas = compositeCanvas.current;
     if (!video || !canvas || isRecording) return;
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
+    canvas.width = w;
+    canvas.height = h;
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : MediaRecorder.isTypeSupported('video/webm')
-      ? 'video/webm'
-      : '';
+    activeRef.current = true;
+    setIsRecording(true);
+    setTotalSeconds(durationSeconds);
+    setSecondsLeft(durationSeconds);
 
-    const stream = canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    chunks.current = [];
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.current.push(e.data);
-    };
-
-    recorder.onstop = () => {
-      const blob = new Blob(chunks.current, { type: mimeType || 'video/webm' });
+    const download = (blob: Blob, ext: string) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `smoke-vision-${durationSeconds}s-${Date.now()}.webm`;
+      a.download = `smoke-vision-${durationSeconds}s-${Date.now()}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -91,37 +69,100 @@ export function useRecorder(
       setSecondsLeft(0);
     };
 
-    mediaRecorder.current = recorder;
-    chunks.current = [];
-    activeRef.current = true;
+    const supportsWebCodecs =
+      typeof VideoEncoder !== 'undefined' &&
+      typeof VideoFrame !== 'undefined';
 
-    recorder.start(200);
-    setIsRecording(true);
-    setTotalSeconds(durationSeconds);
-    setSecondsLeft(durationSeconds);
+    if (supportsWebCodecs) {
+      // ── MP4 via WebCodecs + mp4-muxer ──────────────────────────────
+      const muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: { codec: 'avc', width: w, height: h },
+        fastStart: 'in-memory',
+      });
 
-    drawLoop();
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: (e) => console.error('VideoEncoder error:', e),
+      });
 
-    let remaining = durationSeconds;
-    timerId.current = setInterval(() => {
-      remaining -= 1;
-      setSecondsLeft(remaining);
-      if (remaining <= 0) {
-        clearInterval(timerId.current!);
-        stopAndSave();
-      }
-    }, 1000);
-  }, [isRecording, videoRef, drawLoop, stopAndSave]);
+      encoder.configure({
+        codec: 'avc1.42001f', // H.264 Baseline Profile
+        width: w,
+        height: h,
+        bitrate: 3_000_000,
+        framerate: 30,
+      });
+
+      let frameCount = 0;
+      const startTime = performance.now();
+
+      const loop = () => {
+        if (!activeRef.current) return;
+        drawFrame();
+        if (encoder.state === 'configured') {
+          const timestamp = Math.round((performance.now() - startTime) * 1000);
+          const frame = new VideoFrame(canvas, { timestamp });
+          encoder.encode(frame, { keyFrame: frameCount % 60 === 0 });
+          frame.close();
+          frameCount++;
+        }
+        rafId.current = requestAnimationFrame(loop);
+      };
+      loop();
+
+      let remaining = durationSeconds;
+      timerId.current = setInterval(async () => {
+        remaining--;
+        setSecondsLeft(remaining);
+        if (remaining <= 0) {
+          clearInterval(timerId.current!);
+          activeRef.current = false;
+          if (rafId.current) cancelAnimationFrame(rafId.current);
+          await encoder.flush();
+          encoder.close();
+          muxer.finalize();
+          download(new Blob([muxer.target.buffer], { type: 'video/mp4' }), 'mp4');
+        }
+      }, 1000);
+    } else {
+      // ── WebM fallback via MediaRecorder ───────────────────────────
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => download(new Blob(chunks, { type: mimeType }), 'webm');
+
+      const loop = () => {
+        if (!activeRef.current) return;
+        drawFrame();
+        rafId.current = requestAnimationFrame(loop);
+      };
+      recorder.start(200);
+      loop();
+
+      let remaining = durationSeconds;
+      timerId.current = setInterval(() => {
+        remaining--;
+        setSecondsLeft(remaining);
+        if (remaining <= 0) {
+          clearInterval(timerId.current!);
+          activeRef.current = false;
+          if (rafId.current) cancelAnimationFrame(rafId.current);
+          recorder.stop();
+        }
+      }, 1000);
+    }
+  }, [isRecording, videoRef, drawFrame]);
 
   const cancelRecording = useCallback(() => {
     activeRef.current = false;
     if (rafId.current) cancelAnimationFrame(rafId.current);
     if (timerId.current) clearInterval(timerId.current);
-    if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') {
-      mediaRecorder.current.ondataavailable = null;
-      mediaRecorder.current.onstop = null;
-      mediaRecorder.current.stop();
-    }
     setIsRecording(false);
     setSecondsLeft(0);
   }, []);
