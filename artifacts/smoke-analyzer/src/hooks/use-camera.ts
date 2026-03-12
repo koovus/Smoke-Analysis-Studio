@@ -43,14 +43,13 @@ export function useCamera(videoRef?: React.RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const toggleCamera = useCallback(() => {
-    setIsCameraOn((prev) => {
-      if (prev) {
-        stopCamera();
-      } else {
-        startCamera();
-      }
-      return !prev;
-    });
+    if (streamRef.current) {
+      stopCamera();
+      setIsCameraOn(false);
+    } else {
+      startCamera();
+      setIsCameraOn(true);
+    }
   }, [startCamera, stopCamera]);
 
   useEffect(() => {
