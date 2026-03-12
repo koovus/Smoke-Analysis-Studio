@@ -10,8 +10,8 @@ interface ControlsPanelProps {
 
 export const ControlsPanel = ({ onUpdate }: ControlsPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [threshold, setThreshold] = useState(20);
-  const [brightness, setBrightness] = useState(80);
+  const [threshold, setThreshold] = useState(10);
+  const [brightness, setBrightness] = useState(50);
   const [debug, setDebug] = useState(false);
 
   const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {

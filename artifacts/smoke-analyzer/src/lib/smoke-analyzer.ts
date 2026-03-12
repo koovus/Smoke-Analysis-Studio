@@ -58,10 +58,10 @@ export class SmokeAnalyzer {
   public puffHistory: ExhaleRecord[] = [];
   
   public config: AnalyzerConfig = {
-    diffThreshold: 20,
-    minBrightness: 80,
+    diffThreshold: 10,
+    minBrightness: 50,
     bgUpdateSpeed: 0.05,
-    minBlobArea: 5,
+    minBlobArea: 4,
     showDebug: false
   };
 
@@ -148,7 +148,7 @@ export class SmokeAnalyzer {
     let totalDensity = 0;
     
     for (let i = 0; i < this.grid.length; i++) {
-      if (this.grid[i].smokeScore > 200) { // Threshold for a block to be "smoke"
+      if (this.grid[i].smokeScore > 80) { // Threshold for a block to be "smoke"
         this.grid[i].active = true;
         activeCellCount++;
         totalDensity += this.grid[i].smokeScore;
