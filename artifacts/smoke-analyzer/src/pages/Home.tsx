@@ -3,13 +3,16 @@ import { CameraView } from '@/components/camera-view';
 import { StatsPanel } from '@/components/stats-panel';
 import { HistoryPanel } from '@/components/history-panel';
 import { ControlsPanel } from '@/components/controls-panel';
+import { RecordPanel } from '@/components/record-panel';
 import { useSmokeAnalyzer } from '@/hooks/use-smoke-analyzer';
 import { useCamera } from '@/hooks/use-camera';
+import { useRecorder } from '@/hooks/use-recorder';
 import { Activity, Video, VideoOff } from 'lucide-react';
 
 export default function Home() {
   const { videoRef, procCanvasRef, overlayCanvasRef, metrics, exhales, updateConfig } = useSmokeAnalyzer();
   const { hasPermission, error, isCameraOn, startCamera, stopCamera } = useCamera(videoRef);
+  const { isRecording, secondsLeft, totalSeconds, startRecording, cancelRecording } = useRecorder(videoRef, overlayCanvasRef);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-6 lg:p-8 flex flex-col max-w-[1600px] mx-auto">
@@ -66,6 +69,16 @@ export default function Home() {
               : <><Video className="w-4 h-4" /> TURN CAMERA ON</>
             }
           </button>
+
+          {/* Record clip */}
+          <RecordPanel
+            isRecording={isRecording}
+            secondsLeft={secondsLeft}
+            totalSeconds={totalSeconds}
+            onStart={startRecording}
+            onCancel={cancelRecording}
+            isCameraOn={isCameraOn}
+          />
 
           {/* Sensitivity controls — same column as camera */}
           <ControlsPanel onUpdate={updateConfig} />
