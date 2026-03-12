@@ -1,21 +1,27 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { CameraView } from '@/components/camera-view';
 import { StatsPanel } from '@/components/stats-panel';
 import { HistoryPanel } from '@/components/history-panel';
 import { ControlsPanel } from '@/components/controls-panel';
 import { RecordPanel } from '@/components/record-panel';
+import { EffectsOverlay, EffectsOverlayHandle } from '@/components/effects-overlay';
 import { useSmokeAnalyzer } from '@/hooks/use-smoke-analyzer';
 import { useCamera } from '@/hooks/use-camera';
 import { useRecorder } from '@/hooks/use-recorder';
+import { useKeyEffects } from '@/hooks/use-key-effects';
 import { Activity, Video, VideoOff } from 'lucide-react';
 
 export default function Home() {
   const { videoRef, procCanvasRef, overlayCanvasRef, metrics, exhales, updateConfig } = useSmokeAnalyzer();
   const { hasPermission, error, isCameraOn, startCamera, stopCamera } = useCamera(videoRef);
   const { isRecording, secondsLeft, totalSeconds, startRecording, cancelRecording } = useRecorder(videoRef, overlayCanvasRef);
+  const effectsRef = useRef<EffectsOverlayHandle>(null);
+  useKeyEffects(effectsRef);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-6 lg:p-8 flex flex-col max-w-[1600px] mx-auto">
+
+      <EffectsOverlay ref={effectsRef} />
 
       {/* Header */}
       <header className="flex items-center justify-between mb-6 shrink-0">
@@ -33,9 +39,25 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="hidden md:flex items-center px-3 py-1.5 border border-primary/30 bg-primary/10 rounded-full font-mono text-xs text-primary">
-          <span className="w-2 h-2 rounded-full bg-primary animate-ping mr-2" />
-          LOCAL COMPUTE ACTIVE
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground/70">
+            {[
+              { key: 'W', label: 'coins',     color: 'text-yellow-400' },
+              { key: 'A', label: 'lightning', color: 'text-blue-400' },
+              { key: 'S', label: 'confetti',  color: 'text-pink-400' },
+              { key: 'D', label: 'fire',      color: 'text-orange-400' },
+            ].map(({ key, label, color }) => (
+              <span key={key} className="flex items-center gap-1">
+                <kbd className={`px-1.5 py-0.5 rounded border border-border/60 bg-muted/40 font-bold ${color}`}>{key}</kbd>
+                <span className="opacity-60">{label}</span>
+                <span className="opacity-30 mx-0.5">·</span>
+              </span>
+            ))}
+          </div>
+          <div className="hidden md:flex items-center px-3 py-1.5 border border-primary/30 bg-primary/10 rounded-full font-mono text-xs text-primary">
+            <span className="w-2 h-2 rounded-full bg-primary animate-ping mr-2" />
+            LOCAL COMPUTE ACTIVE
+          </div>
         </div>
       </header>
 
