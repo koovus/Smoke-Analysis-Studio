@@ -79,6 +79,7 @@ export function useRecorder(
         target: new ArrayBufferTarget(),
         video: { codec: 'avc', width: w, height: h },
         fastStart: 'in-memory',
+        firstTimestampBehavior: 'offset',
       });
 
       const encoder = new VideoEncoder({
@@ -103,7 +104,7 @@ export function useRecorder(
         if (encoder.state === 'configured') {
           const timestamp = Math.round((performance.now() - startTime) * 1000);
           const frame = new VideoFrame(canvas, { timestamp });
-          encoder.encode(frame, { keyFrame: frameCount % 60 === 0 });
+          encoder.encode(frame, { keyFrame: frameCount === 0 || frameCount % 60 === 0 });
           frame.close();
           frameCount++;
         }
